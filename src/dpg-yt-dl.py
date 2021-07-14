@@ -7,7 +7,7 @@ import os
 from my_mvLogger import myMvLogger
 # from knownpaths import folderid
 import knownpaths as kp
-
+from screeninfo import get_monitors
 # create viewport takes in config options too!
 
 primary_window = dpg.generate_uuid()
@@ -94,7 +94,7 @@ class YTDL:
 
     def merge_video_and_audio(self):
         ffmpeg_tools.ffmpeg_merge_video_audio(
-            video=f'{str(self.file_path)}\{str(self.video_title)}-a.{str(self.video_extension)}', audio=f'{str(self.file_path)}\{str(self.video_title)}-v.{str(self.audio_extension)}', output=f'{str(self.file_path)}\{str(self.video_title)}.{str(self.video_extension)}', vcodec='copy', acodec='copy')
+            video=f'{str(self.file_path)}\{str(self.video_title)}-v.{str(self.video_extension)}', audio=f'{str(self.file_path)}\{str(self.video_title)}-a.{str(self.audio_extension)}', output=f'{str(self.file_path)}\{str(self.video_title)}.{str(self.video_extension)}', vcodec='copy', acodec='copy')
 
     def cleanup_files(self):
         os.remove(
@@ -103,13 +103,14 @@ class YTDL:
             f'{self.file_path}\{self.video_title}-a.{self.audio_extension}')
 
     def output_folder(self, sender, app_data, user_data):
-        self.file_path = app_data['file_path_name']
+        self.file_path = app_data['current_path']
+        # print(app_data['current_path'])
         dpg.configure_item(item=self.file_path_text_widget,
                            default_value=f'{self.file_path}')
         print(self.file_path)
 
     def download_files(self):
-        self.logger.log_debug(f'Video_title: {self.video_title}')
+        # self.logger.log_debug(f'Video_title: {self.video_title}')
 
         self.logger.log_info('Downloading Audio Please Wait....')
         self.logger.log_debug(
@@ -136,15 +137,42 @@ class YTDL:
         os.startfile(self.file_path)
 
 
+def hexToRGB(hex: str):
+    # h = hex.lstrip('#')
+    return tuple(int(hex[i:i+2], 16) for i in (0, 2, 4))
+
+
+print(hexToRGB('9e9e9e'))
+
+
 folder_id = getattr(FOLDERID, 'Downloads')
 # print(kp.get_path(folderid=folder_id))
-vp = dpg.create_viewport(title='Youtube-DL', width=750, height=750)
+vp = dpg.create_viewport(title='Youtube-DL', width=770, height=750)
 yt = YTDL()
 file_dialog = dpg.add_file_dialog(directory_selector=True, default_path=(kp.get_path(folderid=folder_id)),
                                   show=False, callback=yt.output_folder, width=300, height=400, label='Select an output directory')
 
+font_dir = os.path.join(os.path.dirname(os.path.dirname(
+    os.path.realpath(__file__))), 'fonts/Lato/Lato-Regular.ttf')
+# https://coolors.co/3d5a80-98c1d9-e0fbfc-ee6c4d-293241
+with dpg.theme(default_theme=True) as theme_id:
 
-with dpg.window(label="Example Window", width=750, no_title_bar=True, height=200, id=primary_window, no_move=True, no_resize=True):
+    dpg.add_theme_color(dpg.mvThemeCol_WindowBg, hexToRGB(
+        '3d5a80'), category=dpg.mvThemeCat_Core)
+
+    dpg.add_theme_color(dpg.mvThemeCol_FrameBg, hexToRGB(
+        '293241'), category=dpg.mvThemeCat_Core)
+
+    dpg.add_theme_color(dpg.mvThemeCol_Button, hexToRGB('ee6c4d'),
+                        category=dpg.mvThemeCat_Core)
+
+    dpg.add_theme_style(dpg.mvStyleVar_FrameRounding,
+                        2, category=dpg.mvThemeCat_Core)
+
+with dpg.font_registry():
+    dpg.add_font(font_dir, 18, default_font=True)
+
+with dpg.window(label="Example Window", width=750, no_title_bar=True, height=205, id=primary_window, no_move=True, no_resize=True):
     dpg.set_primary_window(primary_window, False)
 
     with dpg.group(label="InputGroup", width=300):
@@ -171,24 +199,18 @@ with dpg.window(label="Example Window", width=750, no_title_bar=True, height=200
     dpg.add_separator()
     dpg.add_spacing()
     yt.logger = myMvLogger(0, dpg.get_item_height(item=primary_window),
-                           'Log information', width=dpg.get_item_width(item=primary_window), height=500, no_move=True, no_resize=False)
+                           'Log information', width=dpg.get_item_width(item=primary_window), height=500, no_move=True, no_resize=True)
 
     dpg.add_button(label="Download", callback=yt.download_files,
                    user_data=yt.logger)
 
-    # with dpg.window(label='TestWindow', width=300) as nested_window:
-    #     with dpg.tab_bar(label='tb1'):
-    #         with dpg.tab(label='t1'):
-    #             dpg.add_text('Gloood')
-    #             dpg.add_child(label='Test Child')
-    #             dpg_logger.mvLogger()
-    #         # dpg_logger.mvLogger()
-    # logger = dpg_logger.mvLogger().log('Te')
+    dpg.set_viewport_resizable(value=False)
 
-    # dpg.set_item_pos(item=logger, pos=[
-    #                  0, dpg.get_item_height(item=primary_window)])
-    # dpg.get_item_pos()
-    # with dpg_logger.mvLogger():
+# dpg.set_item_theme(primary_window, theme_id)
+# dpg.set_item_theme(file_dialog, theme_id)
+screen = None
+for m in get_monitors():
+    screen = m
 
 
 dpg.setup_dearpygui(viewport=vp)
