@@ -1,11 +1,8 @@
 import dearpygui.dearpygui as dpg
 import re
 import pafy
-import dearpygui.logger as dpg_logger
 from moviepy.editor import *
-import dearpygui.logger as dpg_logger
 import os
-
 from my_mvLogger import myMvLogger
 
 # create viewport takes in config options too!
@@ -31,6 +28,9 @@ class YTDL:
         self.video_extension = None
         self.audio_extension = None
 
+        self.video_url = None
+        self.audio_url = None
+
         self.video_quality_listbox_id = dpg.generate_uuid()
         self.audio_quality_listbox_id = dpg.generate_uuid()
 
@@ -48,6 +48,7 @@ class YTDL:
             str(x) for x in self.available_audio_streams]
         self.audio_element_selected_index = temp_available_audio_stream_str.index(
             user_data)
+        self.audio_url = self.available_audio_streams[self.audio_element_selected_index].url
 
     def select_video_stream_quality(self, sender, user_data):
         video_re = re.search('video:(.*)@', user_data)
@@ -57,11 +58,22 @@ class YTDL:
             str(x) for x in self.available_video_streams]
         self.video_element_selected_index = temp_available_video_stream_str.index(
             user_data)
+        self.video_url = self.available_video_streams[self.video_element_selected_index].url
 
     def get_video_info(self):
         url = str(dpg.get_value(self.url_input_text_id))
         print(url)
         self.video = pafy.new(url=url)
+        # check if title has ':' or '|' or both;
+        # if they do, then replace those characters with and '_'
+        self.video_title = str(self.video.title)
+        if ':' in str(self.video.title) or '|' in str(self.video.title) or ':' and '|' in str(self.video.title):
+            # self.audio_title = str(self.video.title)
+            self.video_title = self.video_title.replace(':', '_')
+            self.audio_title = self.video_title.replace(':', '_')
+            self.video_title = self.video_title.replace('|', '_')
+            self.audio_title = self.video_title.replace('|', '_')
+            print(self.video_title)
         # self.allstreams = self.video.allstreams
         self.available_video_streams = [
             (x) for x in self.video.allstreams if 'video' in str(x)]
@@ -78,25 +90,14 @@ class YTDL:
                            items=self.available_audio_streams, callback=self.select_audio_stream_quality, user_data='USER_DATA')
 
     def merge_video_and_audio(self):
-        # check if title has ':' or '|' or both;
-        # if they do, then replace those characters with and '_'
-
-        self.video_title = str(self.video.title)
-        if ':' in str(self.video.title) or '|' in str(self.video.title) or ':' and '|' in str(self.video.title):
-            # self.audio_title = str(self.video.title)
-            self.video_title = self.video_title.replace(':', '_')
-            self.audio_title = self.video_title.replace(':', '_')
-            self.video_title = self.video_title.replace('|', '_')
-            self.audio_title = self.video_title.replace('|', '_')
-            print(self.video_title)
         ffmpeg_tools.ffmpeg_merge_video_audio(
-            video=f'{str(self.file_path)}\{str(self.video_title)}.{str(self.video_extension)}', audio=f'{str(self.file_path)}\{str(self.video_title)}.{str(self.audio_extension)}', output=f'{str(self.file_path)}\Combined-{str(self.video_title)}.{str(self.video_extension)}', vcodec='copy', acodec='copy')
+            video=f'{str(self.file_path)}\{str(self.video_title)}-a.{str(self.video_extension)}', audio=f'{str(self.file_path)}\{str(self.video_title)}-v.{str(self.audio_extension)}', output=f'{str(self.file_path)}\{str(self.video_title)}.{str(self.video_extension)}', vcodec='copy', acodec='copy')
 
     def cleanup_files(self):
         os.remove(
-            f'{self.file_path}\{self.video_title}.{self.video_extension}')
+            f'{self.file_path}\{self.video_title}-v.{self.video_extension}')
         os.remove(
-            f'{self.file_path}\{self.video_title}.{self.audio_extension}')
+            f'{self.file_path}\{self.video_title}-a.{self.audio_extension}')
 
     def output_folder(self, sender, app_data, user_data):
         self.file_path = app_data['file_path_name']
@@ -104,13 +105,26 @@ class YTDL:
                            default_value=f'{self.file_path}')
         print(self.file_path)
 
-    def download(self):
-        self.logger.log_info('Downloading Video Please Wait....')
-        self.available_video_streams[self.video_element_selected_index].download(
-            quiet=False, filepath=self.file_path)
+    def download_files(self):
+        self.logger.log_debug(f'Video_title: {self.video_title}')
+
         self.logger.log_info('Downloading Audio Please Wait....')
+        self.logger.log_debug(
+            f'VIDEO: {self.video_title}.{self.video_extension}')
+
         self.available_audio_streams[self.audio_element_selected_index].download(
-            quiet=False, filepath=self.file_path)
+            quiet=False, filepath=f'{self.file_path}\{self.video_title}-a.{self.audio_extension}')
+        # print(self.audio_url)
+
+        self.logger.log_info('Downloading Video Please Wait....')
+        self.logger.log_debug(
+            f'Audio: {self.video_title}.{self.audio_extension}')
+        self.logger.log_debug(
+            f'{self.video_url}')
+        # print(self.video_url)
+        self.available_video_streams[self.video_element_selected_index].download(
+            quiet=False, filepath=f'{str(self.file_path)}\{str(self.video_title)}-v.{str(self.video_extension)}')
+
         self.logger.log_info('Merging Audio and Video; Please wait....')
         self.merge_video_and_audio()
         self.logger.log_info('Removing Temp Files....')
@@ -152,9 +166,10 @@ with dpg.window(label="Example Window", width=750, no_title_bar=True, height=200
     dpg.add_separator()
     dpg.add_spacing()
     yt.logger = myMvLogger(0, dpg.get_item_height(item=primary_window),
-                           'Log information', width=dpg.get_item_width(item=primary_window), height=500, no_move=True, no_resize=True)
+                           'Log information', width=dpg.get_item_width(item=primary_window), height=500, no_move=True, no_resize=False)
 
-    dpg.add_button(label="Download", callback=yt.download, user_data=yt.logger)
+    dpg.add_button(label="Download", callback=yt.download_files,
+                   user_data=yt.logger)
 
     # with dpg.window(label='TestWindow', width=300) as nested_window:
     #     with dpg.tab_bar(label='tb1'):
@@ -174,3 +189,4 @@ with dpg.window(label="Example Window", width=750, no_title_bar=True, height=200
 dpg.setup_dearpygui(viewport=vp)
 dpg.show_viewport(vp)
 dpg.start_dearpygui()
+# https://www.youtube.com/watch?v=5mm_gdnOxpU
