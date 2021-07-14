@@ -1,9 +1,11 @@
 import dearpygui.dearpygui as dpg
 import dearpygui.logger as dpg_logger
+import dearpygui.demo as dpgd
 import pafy
 import os
 import re
 from moviepy.editor import *
+import ffmpeg
 
 
 class MainApp:
@@ -13,12 +15,13 @@ class MainApp:
         dpg.setup_dearpygui(viewport=viewport)
         dpg.show_viewport(viewport=viewport, maximized=False)
         # dpg.
+        dpgd.show_demo()
 
         self.video = None
         self.available_streams = []
         self.available_video_streams = []
         self.available_audio_streams = []
-        self.allstreams = None
+        # self.allstreams = None
         self.file_path_name = None
         self.logger = dpg_logger.mvLogger()
         self.logger.log('Test Log')
@@ -113,6 +116,12 @@ class MainApp:
             self.video_title = self.video_title.replace('|', '_')
             self.audio_title = self.video_title.replace('|', '_')
             print(self.video_title)
+        clip = ffmpeg.input(
+            f'{str(self.file_path_name)}\{str(self.video_title)}.{str(self.video_extension)}')
+        audio = ffmpeg.input(
+            f'{str(self.file_path_name)}\{str(self.video_title)}.{str(self.audio_extension)}')
+        # ffmpeg.output(
+        #     clip, audio, f'{str(self.file_path_name)}\Combined-{str(self.video_title)}.{str(self.video_extension)}', vcodec='copy')
         clip = VideoFileClip(
             f'{str(self.file_path_name)}\{str(self.video_title)}.{str(self.video_extension)}')
         audio = AudioFileClip(
@@ -120,7 +129,7 @@ class MainApp:
         video_clip = clip.set_audio(audio)
         # Save video to folder
         video_clip.write_videofile(
-            f'{str(self.file_path_name)}\Combined-{str(self.video_title)}.{str(self.video_extension)}')
+            f'{str(self.file_path_name)}\Combined-{str(self.video_title)}.{str(self.video_extension)}', codec='libvpx')
 
     def cleanup_files(self):
         os.remove(
@@ -136,13 +145,15 @@ class MainApp:
 
     def demoWindow(self):
         with dpg.window(label='Youtube-DL', width=400, height=300):
-            dpg.add_text(default_value="Enter video url")
-            dpg.add_input_text(label="URL Goes Here",
-                               id=self.url_input_text_id, callback=self.get_video_info)
-            dpg.add_button(label='Select output folder',
-                           callback=lambda: dpg.show_item(self.file_dialog_id))
-            self.file_path_text = dpg.add_text(
-                default_value=f'{self.file_path_name}')
+            with dpg.group(label="InputGroup"):
+                dpg.add_text(default_value="Enter video url")
+                dpg.add_input_text(label="URL Goes Here",
+                                   id=self.url_input_text_id, callback=self.get_video_info)
+                dpg.add_button(label='Select output folder',
+                               callback=lambda: dpg.show_item(self.file_dialog_id))
+                dpg.add_same_line()
+                self.file_path_text = dpg.add_text(
+                    default_value=f'{self.file_path_name}')
 
             dpg.add_spacing()
             dpg.add_separator()
@@ -150,15 +161,19 @@ class MainApp:
 
             # dpg.add_button(label="Fetch Information",
             #                callback=self.get_video_info)
-
+            with dpg.group(label="QualityGroup", width=100):
+                self.video_quality_list = dpg.add_combo(label='Video Qualities',
+                                                        items=self.available_video_streams, show=True, id=self.video_quality_listbox_id)
+                self.audio_quality_list = dpg.add_combo(label='Audio Qualities',
+                                                        items=self.available_audio_streams, show=True, id=self.audio_quality_listbox_id)
+            dpg.add_same_line()
+            with dpg.group(label="RadioGroup"):
+                dpg.add_radio_button(label="Select One", items=[
+                                     'Video Only', 'Audio Only'])
             dpg.add_spacing()
             dpg.add_separator()
             dpg.add_spacing()
 
-            self.video_quality_list = dpg.add_combo(label='Video Qualities',
-                                                    items=self.available_video_streams, show=True, id=self.video_quality_listbox_id)
-            self.audio_quality_list = dpg.add_combo(label='Audio Qualities',
-                                                    items=self.available_audio_streams, show=True, id=self.audio_quality_listbox_id)
             dpg.add_button(label="Download",
                            callback=self.download, user_data=self.logger)
         # dpg.set_primary_window(self.demoWindow, True)
