@@ -1,9 +1,12 @@
+from knownpaths import FOLDERID
 import dearpygui.dearpygui as dpg
 import re
 import pafy
 from moviepy.editor import *
 import os
 from my_mvLogger import myMvLogger
+# from knownpaths import folderid
+import knownpaths as kp
 
 # create viewport takes in config options too!
 
@@ -133,10 +136,12 @@ class YTDL:
         os.startfile(self.file_path)
 
 
+folder_id = getattr(FOLDERID, 'Downloads')
+# print(kp.get_path(folderid=folder_id))
 vp = dpg.create_viewport(title='Youtube-DL', width=750, height=750)
 yt = YTDL()
-file_dialog = dpg.add_file_dialog(
-    directory_selector=True, show=False, callback=yt.output_folder, width=300, height=400, label='Select an output directory')
+file_dialog = dpg.add_file_dialog(directory_selector=True, default_path=(kp.get_path(folderid=folder_id)),
+                                  show=False, callback=yt.output_folder, width=300, height=400, label='Select an output directory')
 
 
 with dpg.window(label="Example Window", width=750, no_title_bar=True, height=200, id=primary_window, no_move=True, no_resize=True):
